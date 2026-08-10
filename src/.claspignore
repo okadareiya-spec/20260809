@@ -1,0 +1,10 @@
+# clasp push の対象から除外する
+# ここに書いたものは Apps Script プロジェクトへ送られない
+
+.env
+*.env
+.webhook_token
+.claspignore
+.gitignore
+node_modules/**
+**/*.md

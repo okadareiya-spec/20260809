@@ -1,0 +1,19 @@
+# 秘密情報 — 絶対にコミットしない
+.env
+*.env
+.clasprc.json
+.clasp.json
+.webhook_token
+clasp-login.log
+
+# 依存
+node_modules/
+
+# OS
+Thumbs.db
+desktop.ini
+
+# 生成物・作業ファイル
+__pycache__/
+*.pyc
+*.pdf
