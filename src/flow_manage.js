@@ -156,6 +156,7 @@ function askEditTitle(ctx, userId, p) {
   setPending(userId, { kind: 'edit_title', data: buildPostback(p), values: {} });
   return [quickReplyMsg('新しい予約名を入力してください。', [
     { label: '予約名は変えない', data: buildPostback(withParams(p, { s: 'note' })) },
+    escapeAction(),
   ])];
 }
 
@@ -163,6 +164,7 @@ function askEditNote(ctx, userId, p, values) {
   setPending(userId, { kind: 'edit_note', data: buildPostback(p), values: values });
   return [quickReplyMsg('新しい備考を入力してください。', [
     { label: '備考は変えない', data: buildPostback(withParams(p, { s: 'apply' })) },
+    escapeAction(),
   ])];
 }
 

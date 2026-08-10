@@ -57,11 +57,13 @@ function textMsg(text) {
  * 13件を超える可能性がある選択肢には使わないこと（Flex を使う）。
  */
 function quickReplyMsg(text, items) {
+  // 選択肢を渡し忘れても落とさない。会話が止まるより、テキストだけでも返す方がよい。
+  const list = items || [];
   return {
     type: 'text',
     text: String(text),
     quickReply: {
-      items: items.slice(0, MAX_QUICK_REPLY).map(function (it) {
+      items: list.slice(0, MAX_QUICK_REPLY).map(function (it) {
         return { type: 'action', action: postbackAction(it) };
       }),
     },
@@ -80,7 +82,18 @@ function postbackAction(it) {
 }
 
 /**
- * 縦に伸ばせるボタン一覧。
+ * 手順の途中から抜けるための選択肢。
+ *
+ * どの手順にも必ず1つ置くこと。リッチメニューを押せば実際には抜けられるが、
+ * 画面上に手がかりがないと「この会話から出られない」と受け取られる。
+ * 迷った利用者が管理者に問い合わせる状況を作らないための導線である。
+ */
+function escapeAction() {
+  return { label: 'やめる', data: buildPostback({ a: 'menu' }) };
+}
+
+/**
+ * 縦に伸ばせるボタン一覧。末尾に離脱の選択肢を必ず添える。
  * 開始時刻は営業時間9〜18時で18件になり、クイックリプライの13件に収まらない。
  */
 function flexButtonList(altText, title, description, buttons) {
@@ -88,7 +101,7 @@ function flexButtonList(altText, title, description, buttons) {
   if (description) {
     contents.push({ type: 'text', text: description, size: 'sm', color: '#777777', wrap: true });
   }
-  buttons.forEach(function (b) {
+  buttons.concat([escapeAction()]).forEach(function (b) {
     contents.push({
       type: 'button',
       style: b.primary ? 'primary' : 'secondary',

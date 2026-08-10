@@ -53,6 +53,12 @@ function handleAction(ctx, userId, p) {
   // フローの途中でない操作は、リッチメニューからの開始とみなして入力待ちを捨てる（技術仕様書 7.2）
   if (!p.s) clearPending(userId);
 
+  // 離脱はどの状態からでも通す。登録ゲートより前に置くのは、
+  // 初回登録の途中でも抜けられるようにするため。
+  if (p.a === 'menu') {
+    return [menuPrompt('操作をやめました。はじめから選び直せます。')];
+  }
+
   const user = ctx.users[userId];
   if (!user || !user.name || !user.mail) {
     // 未登録なら先に登録させ、完了後に元の操作へ復帰させる。

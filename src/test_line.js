@@ -179,6 +179,63 @@ function testLine() {
     // 予約名は氏名の第2のコピー。ここを取りこぼすと空き状況に旧氏名が残る。
     t.eq('自動生成の予約名も追随する', renamed.title, 'LINE次郎の予約');
 
+    // --- 途中離脱 -------------------------------------------------------------
+    // どの手順からも抜けられること。画面に手がかりがないと、利用者は
+    // 「この会話から出られない」と受け取り、管理者への問い合わせにつながる。
+    t.group('途中離脱');
+    clearPending(LINE_TEST_USER);
+
+    const steps = [
+      ['日付選択', 'a=new'],
+      ['人数選択', 'a=new&d=' + DAY_C],
+      ['開始時刻選択', 'a=new&d=' + DAY_C + '&n=6'],
+      ['人数の直接入力', 'a=new&d=' + DAY_C + '&s=num'],
+      ['空き状況の時刻選択', 'a=avail&d=' + DAY_C],
+    ];
+    steps.forEach(function (pair) {
+      const msgs = handleLineEvent(ctx, linePostbackEvent(pair[1]));
+      t.eq(pair[0] + 'から抜けられる', findPostback(msgs, 'やめる') !== null, true);
+    });
+
+    // 利用時間・部屋・予約名・備考は、前の手順を通らないと到達できない
+    let m2 = handleLineEvent(ctx, linePostbackEvent('a=new&d=' + DAY_C + '&n=6'));
+    m2 = handleLineEvent(ctx, linePostbackEvent(findPostback(m2, '14:00')));
+    t.eq('利用時間選択から抜けられる', findPostback(m2, 'やめる') !== null, true);
+    m2 = handleLineEvent(ctx, linePostbackEvent(findPostback(m2, '1時間')));
+    t.eq('部屋選択から抜けられる', findPostback(m2, 'やめる') !== null, true);
+    m2 = handleLineEvent(ctx, linePostbackEvent(findPostback(m2, 'おまかせ')));
+    t.eq('予約名の入力から抜けられる', findPostback(m2, 'やめる') !== null, true);
+    m2 = handleLineEvent(ctx, linePostbackEvent(findPostback(m2, '入力せずに進む')));
+    t.eq('備考の入力から抜けられる', findPostback(m2, 'やめる') !== null, true);
+    m2 = handleLineEvent(ctx, linePostbackEvent(findPostback(m2, '入力せずに進む')));
+    t.eq('確認画面から抜けられる', findPostback(m2, 'やめる') !== null, true);
+
+    // 実際に抜けたときの挙動
+    m2 = handleLineEvent(ctx, linePostbackEvent('a=menu'));
+    t.eq('抜けるとメニューが出る', findPostback(m2, '予約する') !== null, true);
+    t.eq('抜けたことを伝える', lineHas(m2, 'やめました'), true);
+    t.eq('入力待ちが破棄される', getPending(LINE_TEST_USER), null);
+
+    // 入力待ちの最中でも、リッチメニューの操作は素通しできること
+    handleLineEvent(ctx, linePostbackEvent('a=new&d=' + DAY_C + '&n=6&s=num'));
+    t.eq('入力待ちが残っている', getPending(LINE_TEST_USER) !== null, true);
+    m2 = handleLineEvent(ctx, linePostbackEvent('a=list'));
+    t.eq('入力待ちでも予約の確認へ行ける', lineHas(m2, '予約'), true);
+    t.eq('その際に入力待ちは破棄される', getPending(LINE_TEST_USER), null);
+
+    // 初回登録の途中でも抜けられること（登録ゲートより前に離脱を通している）
+    handleLineEvent(ctx, {
+      type: 'postback', source: { userId: 'U_LINEESCAPE' }, replyToken: 'T',
+      postback: { data: 'a=new' },
+    });
+    const escaped = handleLineEvent(ctx, {
+      type: 'postback', source: { userId: 'U_LINEESCAPE' }, replyToken: 'T',
+      postback: { data: 'a=menu' },
+    });
+    t.eq('未登録でも離脱できる', lineHas(escaped, 'やめました'), true);
+    t.eq('離脱が登録開始に化けない', lineHas(escaped, 'お名前'), false);
+    clearPending('U_LINEESCAPE');
+
     // --- 例外的な入力 ---------------------------------------------------------
     t.group('例外的な入力');
     clearPending(LINE_TEST_USER);

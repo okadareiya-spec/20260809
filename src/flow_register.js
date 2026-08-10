@@ -20,10 +20,11 @@ const MAX_MAIL_LEN = 254;
  */
 function startRegistration(userId, resumeData) {
   setPending(userId, { kind: 'reg_name', resume: resumeData || '' });
-  return [textMsg(
+  return [quickReplyMsg(
     '会議室予約へようこそ。\n' +
     'はじめに、お名前を教えてください。\n\n' +
-    '（会議室の空き状況を見た方に、予約者として表示されます）'
+    '（会議室の空き状況を見た方に、予約者として表示されます）',
+    [escapeAction()]
   )];
 }
 
@@ -33,10 +34,11 @@ function handleRegisterName(ctx, userId, text, pending) {
     return [textMsg('お名前を読み取れませんでした。もう一度入力してください。')];
   }
   setPending(userId, { kind: 'reg_mail', resume: pending.resume, name: name });
-  return [textMsg(
+  return [quickReplyMsg(
     name + ' さんですね。\n' +
     '次に、メールアドレスを入力してください。\n\n' +
-    '（予約内容とカレンダー登録用のファイルをお送りします）'
+    '（予約内容とカレンダー登録用のファイルをお送りします）',
+    [escapeAction()]
   )];
 }
 
@@ -71,11 +73,13 @@ function handleRegisterMail(ctx, userId, text, pending) {
 function profileStep(ctx, userId, user, p) {
   if (p.f === 'name') {
     setPending(userId, { kind: 'profile_name' });
-    return [textMsg('新しいお名前を入力してください。\n（現在: ' + user.name + '）')];
+    return [quickReplyMsg('新しいお名前を入力してください。\n（現在: ' + user.name + '）',
+      [escapeAction()])];
   }
   if (p.f === 'mail') {
     setPending(userId, { kind: 'profile_mail' });
-    return [textMsg('新しいメールアドレスを入力してください。\n（現在: ' + user.mail + '）')];
+    return [quickReplyMsg('新しいメールアドレスを入力してください。\n（現在: ' + user.mail + '）',
+      [escapeAction()])];
   }
 
   return [flexMsg('登録情報の変更', flexDetailBubble(

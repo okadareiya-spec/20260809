@@ -53,6 +53,7 @@ function askDate(ctx, p, prompt) {
   msg.quickReply.items.push(
     datePickerAction('カレンダーから選ぶ', buildPostback(base), today, max)
   );
+  msg.quickReply.items.push({ type: 'action', action: postbackAction(escapeAction()) });
   return [msg];
 }
 
@@ -69,6 +70,7 @@ function askHeadcount(ctx, p) {
     };
   });
   items.push({ label: '人数を入力', data: buildPostback(withParams(p, { s: 'num' })) });
+  items.push(escapeAction());
 
   return [quickReplyMsg(
     date + '（' + weekdayOf(date) + '）ですね。\n何名で利用しますか。',
@@ -79,7 +81,7 @@ function askHeadcount(ctx, p) {
 /** 人数の直接入力。予約フローと変更フローの両方から使う。 */
 function askHeadcountInput(ctx, userId, p) {
   setPending(userId, { kind: 'num', data: buildPostback(withParams(p, { s: null })) });
-  return [textMsg('人数を数字で入力してください。（例: 8）')];
+  return [quickReplyMsg('人数を数字で入力してください。（例: 8）', [escapeAction()])];
 }
 
 // ---------------------------------------------------------------------------
@@ -209,7 +211,8 @@ function askTitle(ctx, userId, p) {
   setPending(userId, { kind: 'title', data: buildPostback(p), values: {} });
   return [quickReplyMsg(
     '予約名を入力してください。\n（会議室の空き状況を見た方にも表示されます）',
-    [{ label: '入力せずに進む', data: buildPostback(withParams(p, { s: 'note' })) }]
+    [{ label: '入力せずに進む', data: buildPostback(withParams(p, { s: 'note' })) },
+     escapeAction()]
   )];
 }
 
@@ -217,7 +220,8 @@ function askNote(ctx, userId, p, values) {
   setPending(userId, { kind: 'note', data: buildPostback(p), values: values });
   return [quickReplyMsg(
     '備考があれば入力してください。',
-    [{ label: '入力せずに進む', data: buildPostback(withParams(p, { s: 'review' })) }]
+    [{ label: '入力せずに進む', data: buildPostback(withParams(p, { s: 'review' })) },
+     escapeAction()]
   )];
 }
 
@@ -252,7 +256,8 @@ function showBookingReview(ctx, userId, user, p, values) {
     ],
     [
       { label: '確定する', primary: true, data: buildPostback(withParams(p, { s: 'done' })) },
-      { label: 'やり直す', data: buildPostback({ a: 'new' }) },
+      { label: '最初から選び直す', data: buildPostback({ a: 'new' }) },
+      escapeAction(),
     ]
   ))];
 }
@@ -331,7 +336,8 @@ function expiredInputMessage(ctx, userId, p) {
   return [quickReplyMsg(
     '入力の保持期限が切れました。予約名からもう一度お願いします。',
     [{ label: '続きから入力する', data: buildPostback(withParams(p, { s: 'title' })) },
-     { label: '最初からやり直す', data: buildPostback({ a: 'new' }) }]
+     { label: '最初からやり直す', data: buildPostback({ a: 'new' }) },
+     escapeAction()]
   )];
 }
 
