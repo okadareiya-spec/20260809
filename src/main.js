@@ -115,7 +115,10 @@ function doPost(e) {
     }
 
     const body = JSON.parse((e.postData && e.postData.contents) || '{}');
-    const events = body.events || [];
+
+    // events が配列であることを確かめる。壊れた本文や、LINE 以外からの
+    // リクエストでは配列にならず、そのまま forEach すると例外になる。
+    const events = Array.isArray(body.events) ? body.events : [];
 
     // LINE Developers の「検証」ボタンは events を空配列で送る。
     // ここで落ちると、実際には動いていても検証が失敗する。

@@ -65,6 +65,12 @@ function normalizeDate(value) {
   const d = Number(m[3]);
   if (mo < 1 || mo > 12 || d < 1 || d > 31) return null;
 
+  // 2月30日のように、形式は正しいが実在しない日を弾く。
+  // Date は存在しない日を翌月へ繰り上げるため、通してしまうと
+  // 日付の文字列はそのままに、曜日の判定だけが別の日で行われる。
+  const dt = new Date(y, mo - 1, d);
+  if (dt.getFullYear() !== y || dt.getMonth() !== mo - 1 || dt.getDate() !== d) return null;
+
   return y + '-' + pad2(mo) + '-' + pad2(d);
 }
 

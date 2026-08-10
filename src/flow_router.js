@@ -80,6 +80,17 @@ function handleAction(ctx, userId, p) {
 
   resolveRelativeDate(p);
 
+  // 値の妥当性をここで一度だけ確かめる。
+  // postback は URL が漏れれば誰でも送れるため（技術仕様書2.2）、
+  // 正しい画面から来た値であることを前提にしてはならない。
+  // 検査を怠ると「9999-99-99（null）ですね」のような無意味な応答になり、
+  // 利用者にはシステムが壊れたようにしか見えない。
+  const broken = invalidParam(p);
+  if (broken) {
+    Logger.log('postback の値が不正です（' + broken + '）: ' + buildPostback(p));
+    return [menuPrompt('操作の内容を読み取れませんでした。\nお手数ですが、メニューから選び直してください。')];
+  }
+
   switch (p.a) {
     case 'new': return bookingStep(ctx, userId, user, p);
     case 'list': return showReservationList(ctx, userId, user);
@@ -99,6 +110,27 @@ function handleAction(ctx, userId, p) {
  * 焼き込めない。毎日作り直す運用は現実的でないので、相対指定を受け取って
  * ここで解決する。
  */
+/**
+ * postback に載っている値が解釈できるかを確かめる。
+ * 解釈できない項目名を返す。すべて正しければ null。
+ *
+ * ここを通った後の処理は、値が形式として正しいことを前提にしてよい。
+ * 業務としての妥当性（空いているか、締切を過ぎていないか）は別途判定する。
+ */
+function invalidParam(p) {
+  if (p.d !== undefined && normalizeDate(compactToDate(p.d)) === null) return '日付';
+  if (p.t !== undefined && compactToTime(p.t) === null) return '開始時刻';
+  // 'end' は「営業終了まで」を表す特別な値
+  if (p.dur !== undefined && p.dur !== 'end' && !isPositiveInt(p.dur)) return '利用時間';
+  if (p.n !== undefined && !isPositiveInt(p.n)) return '人数';
+  return null;
+}
+
+function isPositiveInt(value) {
+  const n = Number(value);
+  return isFinite(n) && n > 0 && n % 1 === 0;
+}
+
 function resolveRelativeDate(p) {
   if (p.d === 'today') p.d = dateToCompact(nowDateStr());
   else if (p.d === 'tomorrow') p.d = dateToCompact(addDays(nowDateStr(), 1));
