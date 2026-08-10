@@ -20,24 +20,53 @@ const MAX_MAIL_LEN = 254;
  */
 function startRegistration(userId, resumeData) {
   setPending(userId, { kind: 'reg_name', resume: resumeData || '' });
+
+  // 何をしようとして中断されたのかを伝える。目的が見えないと、
+  // 突然の入力要求は「関係のない手続きをさせられている」と受け取られる。
+  const back = resumeLabel(resumeData);
+
   return [quickReplyMsg(
-    '会議室予約へようこそ。\n' +
-    'はじめに、お名前を教えてください。\n\n' +
-    '（会議室の空き状況を見た方に、予約者として表示されます）',
+    '会議室予約へようこそ。\n\n' +
+    'ご利用の前に、お名前とメールアドレスの登録をお願いします。\n' +
+    '【この2つが登録されるまで、予約も空き状況の確認もできません。】\n' +
+    '登録は初回だけです。次回からは聞きません。\n\n' +
+    '━━━━━━━━━━\n' +
+    '【1/2】お名前を入力してください。\n' +
+    '━━━━━━━━━━\n' +
+    '会議室の空き状況を見た方に、予約者として表示されます。' +
+    (back ? '\n\n登録が終わると、そのまま「' + back + '」に戻ります。' : ''),
     [escapeAction()]
   )];
+}
+
+/** 登録のために中断された操作の名前。復帰先を利用者に見せるために使う。 */
+function resumeLabel(resumeData) {
+  if (!resumeData) return '';
+  const labels = {
+    new: '予約', list: '予約の確認', avail: '空き状況',
+    profile: '登録情報の変更', edit: '予約の変更', cancel: '予約のキャンセル',
+  };
+  return labels[parsePostback(resumeData).a] || '';
 }
 
 function handleRegisterName(ctx, userId, text, pending) {
   const name = normalizeName(text);
   if (!name) {
-    return [textMsg('お名前を読み取れませんでした。もう一度入力してください。')];
+    return [quickReplyMsg(
+      'お名前を読み取れませんでした。\n' +
+      '空欄や' + MAX_NAME_LEN + '文字を超える入力は登録できません。もう一度入力してください。',
+      [escapeAction()]
+    )];
   }
   setPending(userId, { kind: 'reg_mail', resume: pending.resume, name: name });
   return [quickReplyMsg(
-    name + ' さんですね。\n' +
-    '次に、メールアドレスを入力してください。\n\n' +
-    '（予約内容とカレンダー登録用のファイルをお送りします）',
+    name + ' さんですね。\n\n' +
+    '━━━━━━━━━━\n' +
+    '【2/2】メールアドレスを入力してください。\n' +
+    '━━━━━━━━━━\n' +
+    '予約内容と、カレンダーに登録するためのファイルをお送りします。\n' +
+    'ここが未登録だと、予約が成立しても通知が届きません。\n\n' +
+    'あと1つで完了です。',
     [escapeAction()]
   )];
 }
@@ -45,17 +74,26 @@ function handleRegisterName(ctx, userId, text, pending) {
 function handleRegisterMail(ctx, userId, text, pending) {
   const mail = normalizeMail(text);
   if (!mail) {
-    return [textMsg('メールアドレスの形式が正しくないようです。もう一度入力してください。')];
+    return [quickReplyMsg(
+      'メールアドレスの形式が正しくないようです。\n' +
+      '「name@example.co.jp」のような形式で入力してください。',
+      [escapeAction()]
+    )];
   }
 
   saveUser(ctx, userId, pending.name, mail);
   clearPending(userId);
 
+  // 変更手段を必ずここで伝える。誤入力に気づくのはこの直後が最も多く、
+  // 変更できることを知らないと管理者への問い合わせになる（運用要件5.5）。
   const done = textMsg(
-    '登録が完了しました。\n' +
-    '　お名前　　　: ' + pending.name + '\n' +
-    '　メールアドレス: ' + mail + '\n\n' +
-    '登録内容は「予約の確認」画面からいつでも変更できます。'
+    '登録が完了しました。\n\n' +
+    '　お名前　　　　：' + pending.name + '\n' +
+    '　メールアドレス：' + mail + '\n\n' +
+    '━━━━━━━━━━\n' +
+    'この内容は、あとから変更できます。\n' +
+    'メニューの【使い方】→【登録情報の変更】から直せます。\n' +
+    '（【予約の確認】画面の末尾からも変更できます）'
   );
 
   // 登録のために中断された操作へ復帰させる

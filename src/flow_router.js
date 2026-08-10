@@ -53,14 +53,24 @@ function handleAction(ctx, userId, p) {
   // フローの途中でない操作は、リッチメニューからの開始とみなして入力待ちを捨てる（技術仕様書 7.2）
   if (!p.s) clearPending(userId);
 
+  const registered = isRegistered(ctx, userId);
+
   // 離脱はどの状態からでも通す。登録ゲートより前に置くのは、
   // 初回登録の途中でも抜けられるようにするため。
   if (p.a === 'menu') {
-    return [menuPrompt('操作をやめました。はじめから選び直せます。')];
+    return [menuPrompt(registered
+      ? '操作をやめました。はじめから選び直せます。'
+      : '登録を中断しました。\n' +
+        'ご利用にはお名前とメールアドレスの登録が必要です。\n' +
+        '次に操作したときに、もう一度はじめからお伺いします。')];
   }
 
+  // 使い方は登録前でも読めるようにする。参照するだけで情報にも触れない。
+  // 読む前に登録を強いると、何のための登録なのか分からないまま入力させることになる。
+  if (p.a === 'help') return showHelp(ctx, registered);
+
   const user = ctx.users[userId];
-  if (!user || !user.name || !user.mail) {
+  if (!registered) {
     // 未登録なら先に登録させ、完了後に元の操作へ復帰させる。
     // 登録のために操作が失われてはならない（システム要件 2.2）。
     // 相対日付は解決せずに保存する。日をまたいで登録を終えた場合、
@@ -77,7 +87,6 @@ function handleAction(ctx, userId, p) {
     case 'cancel': return cancelStep(ctx, userId, user, p);
     case 'avail': return availabilityStep(ctx, userId, p);
     case 'profile': return profileStep(ctx, userId, user, p);
-    case 'help': return showHelp(ctx);
     default:
       return [menuPrompt('やりたいことを選んでください。')];
   }
@@ -177,27 +186,42 @@ function handleEditNoteInput(ctx, userId, text, pending) {
 // 共通
 // ---------------------------------------------------------------------------
 
+function isRegistered(ctx, userId) {
+  const u = ctx.users[userId];
+  return !!(u && u.name && u.mail);
+}
+
 /**
  * 使い方の案内。リッチメニューの「使い方」から開く。
  * 説明なしで使えることを目指しているが（G-U3）、迷ったときの逃げ道は用意しておく。
+ *
+ * 登録情報の変更をここに置くのは、「予約の確認」画面の末尾だけだと
+ * 導線が見つけにくいため。変更できることを知らないと、誤入力に気づいた
+ * 利用者が管理者へ問い合わせることになる（運用要件5.5）。
  */
-function showHelp(ctx) {
-  return [flexMsg('使い方', flexDetailBubble(
-    '会議室予約の使い方',
-    [
-      { label: '予約する', value: '「今日」「明日」を押すとその日の予約に進みます。別の日は「日付を選ぶ」から。' },
-      { label: '選ぶ順番', value: '日付 → 人数 → 開始時刻 → 利用時間 → 部屋 の順です。空いていない選択肢は最初から表示されません。' },
-      { label: 'おまかせ', value: '部屋の選択で「おまかせ」を選ぶと、人数を収容できる一番小さい部屋が割り当てられます。' },
-      { label: '変更', value: '「予約の確認」から、日時・部屋・人数・予約名を変えられます。ご自身の予約だけです。' },
-      { label: 'カレンダー', value: '予約するとメールが届きます。添付ファイルを開くと、ご自身のカレンダーに登録されます。変更やキャンセルも自動で反映されます。' },
-      { label: '他の方の予約', value: '変更・キャンセルはできません。予約者ご本人か、管理者にご相談ください。' },
-    ],
-    [
-      { label: '予約する', primary: true, data: buildPostback({ a: 'new' }) },
-      { label: '空き状況を見る', data: buildPostback({ a: 'avail' }) },
-    ],
-    '予約できるのは ' + ctx.config.bookableDays + ' 日先までです。開始時刻を過ぎた予約は変更・キャンセルできません。'
-  ))];
+function showHelp(ctx, registered) {
+  const rows = [
+    { label: '予約する', value: '「今日」「明日」を押すとその日の予約に進みます。別の日は「日付を選ぶ」から。' },
+    { label: '選ぶ順番', value: '日付 → 人数 → 開始時刻 → 利用時間 → 部屋 の順です。空いていない選択肢は最初から表示されません。' },
+    { label: 'おまかせ', value: '部屋の選択で「おまかせ」を選ぶと、人数を収容できる一番小さい部屋が割り当てられます。' },
+    { label: '途中でやめる', value: 'どの画面にも「やめる」があります。押すとメニューに戻り、別の操作に移れます。' },
+    { label: '変更', value: '「予約の確認」から、日時・部屋・人数・予約名を変えられます。ご自身の予約だけです。' },
+    { label: 'カレンダー', value: '予約するとメールが届きます。添付ファイルを開くと、ご自身のカレンダーに登録されます。変更やキャンセルも自動で反映されます。' },
+    { label: '登録情報', value: 'お名前とメールアドレスは、下の「登録情報の変更」からいつでも直せます。' },
+    { label: '他の方の予約', value: '変更・キャンセルはできません。予約者ご本人か、管理者にご相談ください。' },
+  ];
+
+  const buttons = [{ label: '予約する', primary: true, data: buildPostback({ a: 'new' }) }];
+  if (registered) {
+    buttons.push({ label: '登録情報の変更', data: buildPostback({ a: 'profile' }) });
+  }
+  buttons.push({ label: '空き状況を見る', data: buildPostback({ a: 'avail' }) });
+
+  const note = '予約できるのは ' + ctx.config.bookableDays + ' 日先までです。' +
+    '開始時刻を過ぎた予約は変更・キャンセルできません。' +
+    (registered ? '' : '\n\nはじめてご利用の場合、最初にお名前とメールアドレスの登録をお願いします。');
+
+  return [flexMsg('使い方', flexDetailBubble('会議室予約の使い方', rows, buttons, note))];
 }
 
 function menuPrompt(text) {

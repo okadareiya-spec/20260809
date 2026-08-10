@@ -27,16 +27,29 @@ function testLine() {
     t.group('初回登録');
     let m = handleLineEvent(ctx, lineTextEvent('予約する'));
     t.eq('未登録なら登録から始まる', lineHas(m, 'お名前'), true);
+    // 目的と終わりが見えないと、突然の入力要求は手続きの押し付けに見える
+    t.eq('登録が必須だと伝える', lineHas(m, '予約も空き状況の確認もできません'), true);
+    t.eq('初回だけだと伝える', lineHas(m, '登録は初回だけ'), true);
+    t.eq('何問目かを示す', lineHas(m, '【1/2】'), true);
+    t.eq('復帰先を伝える', lineHas(m, '「予約」に戻ります'), true);
+    t.eq('登録の途中でも抜けられる', findPostback(m, 'やめる') !== null, true);
+
+    m = handleLineEvent(ctx, lineTextEvent(''));
+    t.eq('空の氏名は受け付けない', lineHas(m, '読み取れませんでした'), true);
 
     m = handleLineEvent(ctx, lineTextEvent('LINE太郎'));
     t.eq('氏名の次はメールアドレス', lineHas(m, 'メールアドレス'), true);
+    t.eq('残りが分かる', lineHas(m, '【2/2】'), true);
+    t.eq('未登録だと通知が届かないと伝える', lineHas(m, '通知が届きません'), true);
 
     m = handleLineEvent(ctx, lineTextEvent('bad-mail'));
     t.eq('不正なメールは受け付けない', lineHas(m, '形式が正しくない'), true);
 
     m = handleLineEvent(ctx, lineTextEvent(LINE_TEST_MAIL));
     t.eq('登録が完了する', lineHas(m, '登録が完了しました'), true);
-    t.eq('後から変更できると案内する', lineHas(m, '変更できます'), true);
+    // 誤入力に気づくのは登録直後が最も多い。変更手段をその場で伝えること。
+    t.eq('変更できると案内する', lineHas(m, 'あとから変更できます'), true);
+    t.eq('変更の場所を明示する', lineHas(m, '登録情報の変更'), true);
     // 登録のために中断された操作へ戻ること
     t.eq('元の操作（予約）へ復帰する', lineHas(m, '利用日'), true);
 
@@ -235,6 +248,41 @@ function testLine() {
     t.eq('未登録でも離脱できる', lineHas(escaped, 'やめました'), true);
     t.eq('離脱が登録開始に化けない', lineHas(escaped, 'お名前'), false);
     clearPending('U_LINEESCAPE');
+
+    // --- 使い方と登録情報の導線 --------------------------------------------------
+    t.group('使い方の案内');
+    m = handleLineEvent(ctx, linePostbackEvent('a=help'));
+    t.eq('使い方が開く', lineHas(m, '会議室予約の使い方'), true);
+    // 「予約の確認」の末尾だけだと見つけにくい。使い方からも辿れること。
+    t.eq('登録情報の変更ボタンがある', findPostback(m, '登録情報の変更') !== null, true);
+    t.eq('変更できることを本文でも案内する', lineHas(m, 'いつでも直せます'), true);
+    t.eq('途中でやめられることを案内する', lineHas(m, '途中でやめる'), true);
+
+    m = handleLineEvent(ctx, linePostbackEvent(findPostback(m, '登録情報の変更')));
+    t.eq('使い方から登録情報へ行ける', lineHas(m, '登録情報'), true);
+    t.eq('現在の登録内容が出る', lineHas(m, 'LINE次郎') || lineHas(m, 'LINE太郎'), true);
+
+    // 未登録でも使い方は読めること。読む前に登録を強いない。
+    const helpBefore = handleLineEvent(ctx, {
+      type: 'postback', source: { userId: 'U_LINEHELP' }, replyToken: 'T',
+      postback: { data: 'a=help' },
+    });
+    t.eq('未登録でも使い方は読める', lineHas(helpBefore, '会議室予約の使い方'), true);
+    t.eq('未登録には登録が必要だと添える', lineHas(helpBefore, '登録をお願いします'), true);
+    t.eq('未登録には変更ボタンを出さない', findPostback(helpBefore, '登録情報の変更'), null);
+    clearPending('U_LINEHELP');
+
+    // 登録を中断したときは、登録が必須であることを伝える
+    handleLineEvent(ctx, {
+      type: 'postback', source: { userId: 'U_LINEHELP' }, replyToken: 'T',
+      postback: { data: 'a=new' },
+    });
+    const quit = handleLineEvent(ctx, {
+      type: 'postback', source: { userId: 'U_LINEHELP' }, replyToken: 'T',
+      postback: { data: 'a=menu' },
+    });
+    t.eq('中断すると登録が必要だと伝える', lineHas(quit, '登録が必要です'), true);
+    clearPending('U_LINEHELP');
 
     // --- 例外的な入力 ---------------------------------------------------------
     t.group('例外的な入力');
