@@ -245,8 +245,11 @@ function testLine() {
       type: 'postback', source: { userId: 'U_LINEESCAPE' }, replyToken: 'T',
       postback: { data: 'a=menu' },
     });
-    t.eq('未登録でも離脱できる', lineHas(escaped, 'やめました'), true);
-    t.eq('離脱が登録開始に化けない', lineHas(escaped, 'お名前'), false);
+    t.eq('未登録でも離脱できる', lineHas(escaped, '中断しました'), true);
+    // 登録が始まったかどうかは【1/2】の有無で判定する。
+    // 未登録向けの離脱メッセージにも「お名前」の語は出るため、文言では判別できない。
+    t.eq('離脱が登録開始に化けない', lineHas(escaped, '【1/2】'), false);
+    t.eq('離脱で入力待ちが消える', getPending('U_LINEESCAPE'), null);
     clearPending('U_LINEESCAPE');
 
     // --- 使い方と登録情報の導線 --------------------------------------------------
