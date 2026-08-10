@@ -73,6 +73,27 @@ function safeGetEvent(cal, eventId) {
   }
 }
 
+/**
+ * 予定を削除する。既に消えていた場合は成功として扱う。
+ *
+ * getEventById は削除済みの予定に対しても、操作した時点で例外を投げる
+ * オブジェクトを返すことがある。ここで例外を通すと、キャンセル自体は
+ * 正しく完了しているのに警告列へ記録され、管理者へ障害通知まで飛ぶ。
+ * 目的の状態（予定が存在しない）は既に達成されているため、問題ではない。
+ *
+ * @return 実際に削除したら true
+ */
+function safeDeleteEvent(ev) {
+  if (!ev) return false;
+  try {
+    ev.deleteEvent();
+    return true;
+  } catch (e) {
+    Logger.log('予定は既に削除されていました: ' + e);
+    return false;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // 同期
 // ---------------------------------------------------------------------------
@@ -95,8 +116,7 @@ function syncCalendarForReservation(ctx, action, reservation) {
   if (action === 'キャンセル') {
     // 未同期の予約をキャンセルした場合は何もしない。削除すべき予定が存在しない。
     if (!reservation.calendarEventId) return;
-    const ev = safeGetEvent(cal, reservation.calendarEventId);
-    if (ev) ev.deleteEvent();
+    safeDeleteEvent(safeGetEvent(cal, reservation.calendarEventId));
     // イベントIDは空欄に戻さない。空欄は「未同期」を意味し、
     // 戻すとキャンセル済みの予約が変更操作で再作成されてしまう（技術仕様書 5.4）。
     return;

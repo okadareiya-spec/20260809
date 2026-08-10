@@ -172,8 +172,9 @@ function deleteTestCalendarEvents(rows) {
   rows.forEach(function (r) {
     const eventId = String(r['カレンダーイベントID'] || '').trim();
     if (!eventId) return;
-    const ev = safeGetEvent(cal, eventId);
-    if (ev) { ev.deleteEvent(); removed++; }
+    // キャンセル済みの予約は同期処理が既に予定を消している。
+    // イベントIDは「未同期」との区別のため残す設計なので、ここには必ず値が入っている。
+    if (safeDeleteEvent(safeGetEvent(cal, eventId))) removed++;
   });
   return removed;
 }

@@ -194,6 +194,13 @@ function verifyNotifyLive() {
 
       syncCalendarForReservation(ctx, 'キャンセル', r);
       out.push('  OK   予定を削除しました');
+
+      // 同じ予約に対してキャンセルの同期が2回走ることがある。
+      // シート直接編集では、キャンセル済みの行をもう一度編集すると再度キャンセル扱いになる。
+      // ここで例外が出ると、キャンセル自体は成功しているのに警告と障害通知が飛ぶ。
+      syncCalendarForReservation(ctx, 'キャンセル', r);
+      out.push('  OK   削除済みの予定に再度同期しても落ちない');
+
       out.push('  ※ カレンダーを開き、この予定が残っていないことを確認してください');
     } catch (e) {
       out.push('  NG   ' + e);
