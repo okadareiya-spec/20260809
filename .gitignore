@@ -17,3 +17,6 @@ desktop.ini
 __pycache__/
 *.pyc
 *.pdf
+
+# Office の一時ファイル（開いている間だけ作られる）
+~$*
